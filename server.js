@@ -1,46 +1,19 @@
-
 import express from "express";
-import axios from "axios";
-import * as cheerio from "cheerio";
+import scrapeMerx from "./scraper/merx.js";
+import scrapeSeao from "./scraper/seao.js";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
-async function scrapeMerx() {
-  const url = "https://www.merx.com/public/supplier/solicitations";
-  const bids = [];
-
-  try {
-    const { data } = await axios.get(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36"
-      }
-    });
-
-    const $ = cheerio.load(data);
-
-    $(".solicitation .solicitation-title").each((_, el) => {
-      const title = $(el).text().trim();
-      const link = "https://www.merx.com" + $(el).attr("href");
-      bids.push({
-        title,
-        source: "MERX",
-        status: "Open",
-        deadline: "TBD",
-        link,
-      });
-    });
-  } catch (err) {
-    console.error("MERX scraping failed:", err.message);
-  }
-
-  return bids;
-}
+const PORT = process.env.PORT || 10000;
 
 app.get("/api/bids", async (req, res) => {
-  const bids = await scrapeMerx();
-  res.json(bids);
+  try {
+    const [merxData, seaoData] = await Promise.all([scrapeMerx(), scrapeSeao()]);
+    const bids = [...merxData, ...seaoData];
+    res.json(bids);
+  } catch (err) {
+    console.error("Error during scraping:", err.message);
+    res.status(500).json({ error: "Scraping failed" });
+  }
 });
 
 app.listen(PORT, () => {
